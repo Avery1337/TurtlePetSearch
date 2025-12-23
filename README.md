@@ -1,3 +1,5 @@
+TurtlePetSearch
+This addon was made by Speedz1337.  Pet title guide on the forums is linked here.  https://forum.turtlecraft.gg/viewtopic.php?t=8172
 This is a addon to search through your companion spellbook on Turtle WoW.  Simply open up your spellbook and type in the search bar at the top.  There is a Result Counter to the left of the search bar to see how many pets you are cycling through.
 
 <img width="398" height="453" alt="image" src="https://github.com/user-attachments/assets/7d318ad0-b98f-4f3b-8a35-28da314de027" />
