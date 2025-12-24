@@ -41,14 +41,8 @@ local detailContent = DetailFrame:CreateFontString(nil, "OVERLAY", "GameFontHigh
 detailContent:SetPoint("TOPLEFT", DetailFrame, "TOPLEFT", 15, -30)
 detailContent:SetJustifyH("LEFT")
 
--- Function to show/hide missing/owned pets (TOGGLE VERSION)
+-- Function to show missing/owned pets
 local function ShowDetails(titleName, dataList)
-    -- If it's already open and we click the same title, close it
-    if DetailFrame:IsVisible() and detailTitle:GetText() == titleName then
-        DetailFrame:Hide()
-        return
-    end
-
     local numTabs = GetNumSpellTabs()
     local companionTabID = numTabs - 1
     local _, _, offset, numSpells = GetSpellTabInfo(companionTabID)
@@ -225,6 +219,23 @@ searchBox:SetScript("OnEnterPressed", function()
 end)
 
 searchBox:SetScript("OnEscapePressed", function() this:ClearFocus() end)
-local function ClearHL() highlighter:Hide() end
-if SpellBookPrevPageButton then SpellBookPrevPageButton:SetScript("PostClick", ClearHL) end
-if SpellBookNextPageButton then SpellBookNextPageButton:SetScript("PostClick", ClearHL) end
+
+-- FIX FOR 1.12: Hooking core functions to clear highlight
+local originalUpdate = SpellBookFrame_Update
+SpellBookFrame_Update = function()
+    highlighter:Hide()
+    originalUpdate()
+end
+
+-- Hook page buttons specifically for 1.12 click handling
+local originalNext = SpellBookNextPageButton_OnClick
+SpellBookNextPageButton_OnClick = function()
+    highlighter:Hide()
+    originalNext()
+end
+
+local originalPrev = SpellBookPrevPageButton_OnClick
+SpellBookPrevPageButton_OnClick = function()
+    highlighter:Hide()
+    originalPrev()
+end
