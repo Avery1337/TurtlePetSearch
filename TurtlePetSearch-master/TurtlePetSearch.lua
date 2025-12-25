@@ -5,6 +5,19 @@ local FROG_LIST = { ["Azure Frog"]=1, ["Bullfrog"]=1, ["Dart Frog"]=1, ["Dream F
 local CAT_LIST = { ["Bombay"]=1, ["Black Tabby"]=1, ["Cornish Rex"]=1, ["Orange Tabby"]=1, ["Siamese"]=1, ["White Kitten"]=1, ["Mr. Bigglesworth"]=1, ["Midnight"]=1, ["Corrupted Kitten"]=1, ["White Tiger Cub"]=1, ["Silver Tabby"]=1 }
 local SPIDER_LIST = { ["Araxxna's Hatchling"]=1, ["Cavernweb Hatchling"]=1, ["Maexxna's Hatchling"]=1, ["Razzashi Hatchling"]=1, ["Skitterweb Hatchling"]=1, ["Black Widow Hatchling"]=1, ["Darkmist Hatchling"]=1, ["Lava Hatchling"]=1, ["Mistbark Hatchling"]=1, ["Night Web Hatchling"]=1, ["Smolderweb Hatchling"]=1, ["Tarantula Hatchling"]=1, ["Timberweb Hatchling"]=1, ["Webwood Hatchling"]=1, ["Wildthorn Hatchling"]=1 }
 
+-- Helper function to find the correct tab ID dynamically with nil safety
+local function GetCompanionTabID()
+    local numTabs = GetNumSpellTabs()
+    if not numTabs or numTabs == 0 then return nil end
+    for i = 1, numTabs do
+        local name = GetSpellTabInfo(i)
+        if name and (name == "Companions" or name == "Pets") then 
+            return i 
+        end
+    end
+    return numTabs > 1 and numTabs or nil
+end
+
 -- ==========================================================
 -- TITLES INTERFACE (MAIN WINDOW)
 -- ==========================================================
@@ -22,7 +35,6 @@ TitlesFrame:SetScript("OnMouseDown", function() this:StartMoving() end)
 TitlesFrame:SetScript("OnMouseUp", function() this:StopMovingOrSizing() end)
 TitlesFrame:Hide()
 
--- Checklist Detail Window (Secondary)
 local DetailFrame = CreateFrame("Frame", "TurtleTitlesDetail", TitlesFrame)
 DetailFrame:SetWidth(250) DetailFrame:SetHeight(320)
 DetailFrame:SetPoint("LEFT", TitlesFrame, "RIGHT", 5, 0)
@@ -41,11 +53,11 @@ local detailContent = DetailFrame:CreateFontString(nil, "OVERLAY", "GameFontHigh
 detailContent:SetPoint("TOPLEFT", DetailFrame, "TOPLEFT", 15, -30)
 detailContent:SetJustifyH("LEFT")
 
--- Function to show missing/owned pets
 local function ShowDetails(titleName, dataList)
-    local numTabs = GetNumSpellTabs()
-    local companionTabID = numTabs - 1
+    local companionTabID = GetCompanionTabID()
+    if not companionTabID then return end
     local _, _, offset, numSpells = GetSpellTabInfo(companionTabID)
+    if not offset then return end
     
     local owned = {}
     for i = (offset + 1), (offset + numSpells) do
@@ -99,10 +111,11 @@ local barCat, txtCat = CreatePetBar("Crazy Cat Lady", -110, 11, {r=1, g=0.5, b=0
 local barSpider, txtSpider = CreatePetBar("Itsy Bitsy Hero", -170, 15, {r=0.6, g=0.3, b=0.8}, SPIDER_LIST)
 
 local function UpdatePetStats()
-    local numTabs = GetNumSpellTabs()
-    local companionTabID = numTabs - 1
-    if companionTabID < 1 then return end
+    local companionTabID = GetCompanionTabID()
+    if not companionTabID then return end
     local _, _, offset, numSpells = GetSpellTabInfo(companionTabID)
+    if not offset then return end
+    
     local fCount, cCount, sCount = 0, 0, 0
     for i = (offset + 1), (offset + numSpells) do
         local name = GetSpellName(i, BOOKTYPE_SPELL)
@@ -126,13 +139,11 @@ closeBtn:SetPoint("TOPRIGHT", TitlesFrame, "TOPRIGHT", -5, -5)
 -- SEARCH BAR & INTERFACE INTEGRATION
 -- ==========================================================
 local PARENT_FRAME = SpellBookFrame 
-local BOX_WIDTH, BOX_HEIGHT = 130, 24
-local POS_X, POS_Y = -55, -45
 local lastSearchText, currentMatchIndex = "", 0
 
 local searchBox = CreateFrame("EditBox", "TurtlePetSearchBox", PARENT_FRAME, "InputBoxTemplate")
-searchBox:SetWidth(BOX_WIDTH) searchBox:SetHeight(BOX_HEIGHT)
-searchBox:SetPoint("TOPRIGHT", PARENT_FRAME, "TOPRIGHT", POS_X, POS_Y)
+searchBox:SetWidth(130) searchBox:SetHeight(24)
+searchBox:SetPoint("TOPRIGHT", PARENT_FRAME, "TOPRIGHT", -55, -45)
 searchBox:SetAutoFocus(false)
 searchBox:SetText("Search Pet...")
 searchBox:SetMaxLetters(50)
@@ -158,6 +169,26 @@ highlightTex:SetAllPoints(highlighter)
 highlightTex:SetTexture("Interface\\Buttons\\CheckButtonHilight")
 highlightTex:SetBlendMode("ADD")
 
+-- Clear Function
+local function ResetSearch()
+    searchBox:SetText("Search Pet...")
+    counterText:SetText("")
+    highlighter:Hide()
+    lastSearchText = ""
+    currentMatchIndex = 0
+end
+
+local clearBtn = CreateFrame("Button", nil, searchBox)
+clearBtn:SetWidth(16) clearBtn:SetHeight(16)
+clearBtn:SetPoint("RIGHT", searchBox, "RIGHT", -5, 0)
+local clearTex = clearBtn:CreateTexture(nil, "OVERLAY")
+clearTex:SetAllPoints()
+clearTex:SetTexture("Interface\\Buttons\\UI-GroupLoot-Pass-Up")
+clearBtn:SetAlpha(0.5)
+clearBtn:SetScript("OnClick", function() ResetSearch() searchBox:ClearFocus() end)
+clearBtn:SetScript("OnEnter", function() this:SetAlpha(1) end)
+clearBtn:SetScript("OnLeave", function() this:SetAlpha(0.5) end)
+
 searchBox:SetScript("OnEditFocusGained", function() if this:GetText() == "Search Pet..." then this:SetText("") end end)
 searchBox:SetScript("OnEditFocusLost", function() if this:GetText() == "" then this:SetText("Search Pet...") end end)
 
@@ -165,30 +196,49 @@ searchBox:SetScript("OnEnterPressed", function()
     local text = string.lower(this:GetText())
     highlighter:Hide()
     if text == "" or text == "search pet..." then counterText:SetText("") return end
-    if text ~= lastSearchText then lastSearchText = text currentMatchIndex = 0 end
-    local numTabs = GetNumSpellTabs()
-    local companionTabID = numTabs - 1
-    if companionTabID < 1 then companionTabID = 1 end
+    
+    if text ~= lastSearchText then 
+        lastSearchText = text 
+        currentMatchIndex = 0 
+    end
+    
+    local companionTabID = GetCompanionTabID()
+    if not companionTabID then return end
     local _, _, offset, numSpells = GetSpellTabInfo(companionTabID)
+    
     local matches, count = {}, 0
     for i = (offset + 1), (offset + numSpells) do
         local name = GetSpellName(i, BOOKTYPE_SPELL)
         if name and string.find(string.lower(name), text, 1, true) then
-            count = count + 1 matches[count] = i
+            count = count + 1 
+            matches[count] = i
         end
     end
-    if count == 0 then counterText:SetText("0") counterText:SetTextColor(1, 0, 0) currentMatchIndex = 0 return end
+
+    if count == 0 then 
+        counterText:SetText("0") 
+        counterText:SetTextColor(1, 0, 0) 
+        currentMatchIndex = 0 
+        return 
+    end
+
     currentMatchIndex = currentMatchIndex + 1
     local needsReset = false
-    if currentMatchIndex > count then currentMatchIndex = 1 needsReset = true end
-    counterText:SetText(currentMatchIndex.."/"..count) counterText:SetTextColor(1, 0.8, 0)
+    if currentMatchIndex > count then 
+        currentMatchIndex = 1 
+        needsReset = true 
+    end
+
+    counterText:SetText(currentMatchIndex.."/"..count) 
+    counterText:SetTextColor(1, 0.8, 0)
+    
     local targetID = matches[currentMatchIndex]
     if targetID then
         local tabBtn = getglobal("SpellBookSkillLineTab"..companionTabID)
         if tabBtn then tabBtn:Click() end
         local navigator = CreateFrame("Frame")
         navigator.timer, navigator.targetID = 0, targetID
-        if needsReset then navigator.state = "RESET" else navigator.state = "SCAN" end
+        navigator.state = needsReset and "RESET" or "SCAN"
         navigator:SetScript("OnUpdate", function()
             this.timer = this.timer + arg1
             if this.timer > 0.1 then
@@ -204,7 +254,9 @@ searchBox:SetScript("OnEnterPressed", function()
                             local bID = SpellBook_GetSpellID(btn:GetID())
                             if bID == this.targetID then
                                 highlighter:SetPoint("CENTER", btn, "CENTER", 0, 0)
-                                highlighter:Show() found = true break
+                                highlighter:Show() 
+                                found = true 
+                                break
                             end
                         end
                     end
@@ -218,24 +270,23 @@ searchBox:SetScript("OnEnterPressed", function()
     end
 end)
 
-searchBox:SetScript("OnEscapePressed", function() this:ClearFocus() end)
+searchBox:SetScript("OnEscapePressed", function() ResetSearch() this:ClearFocus() end)
 
--- FIX FOR 1.12: Hooking core functions to clear highlight
+-- HOOKS: Hide highlight on navigation without wiping the counter
 local originalUpdate = SpellBookFrame_Update
 SpellBookFrame_Update = function()
-    highlighter:Hide()
-    originalUpdate()
+    if highlighter then highlighter:Hide() end
+    if originalUpdate then originalUpdate() end
 end
 
--- Hook page buttons specifically for 1.12 click handling
 local originalNext = SpellBookNextPageButton_OnClick
 SpellBookNextPageButton_OnClick = function()
-    highlighter:Hide()
-    originalNext()
+    if highlighter then highlighter:Hide() end
+    if originalNext then originalNext() end
 end
 
 local originalPrev = SpellBookPrevPageButton_OnClick
 SpellBookPrevPageButton_OnClick = function()
-    highlighter:Hide()
-    originalPrev()
+    if highlighter then highlighter:Hide() end
+    if originalPrev then originalPrev() end
 end
